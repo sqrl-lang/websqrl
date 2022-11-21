@@ -1,13 +1,9 @@
 import Head from "next/head";
-import dynamic from "next/dynamic";
-
 import { useEffect, useState, useRef } from "react";
-
 import { sprintf } from "sprintf-js";
 import SAMPLE from "../src/sample.sqrl";
 import Split from "react-split";
 import { invariant } from "../src/invariant";
-import Worker from "worker-loader!../workers/compile.worker";
 import {
   addMinutes,
   subMilliseconds,
@@ -15,8 +11,7 @@ import {
   differenceInMilliseconds,
 } from "date-fns";
 import { Request, Response, WikiEvent, Result } from "../src/types";
-
-const MonacoEditor = dynamic(import("react-monaco-editor"), { ssr: false });
+import { MonacoEditor } from "../src/MonacoEditor";
 
 let LOG_ID = 0;
 const DELAY_MS = 60_000 * 3;
@@ -153,7 +148,9 @@ export default function Home() {
 
   useEffect(() => {
     invariant(!worker.current, "Worker created twice");
-    worker.current = new Worker();
+    worker.current = new Worker(
+      new URL("../workers/compile.worker", import.meta.url)
+    );
     worker.current.onmessage = (event) => {
       const res = event.data as Response;
       if (res.type === "compileOkay") {
@@ -215,27 +212,12 @@ export default function Home() {
         })}
         style={{ width: "100%", height: "100%", display: "flex" }}
       >
-        <div>
-          <MonacoEditor
-            value={source}
-            onChange={setSource}
-            language="cpp"
-            theme="vs-dark"
-            editorDidMount={() => {
-              (window as any).MonacoEnvironment.getWorkerUrl = (
-                moduleId,
-                label
-              ) => {
-                if (label === "json") return "_next/static/json.worker.js";
-                if (label === "css") return "_next/static/css.worker.js";
-                if (label === "html") return "_next/static/html.worker.js";
-                if (label === "typescript" || label === "javascript")
-                  return "_next/static/ts.worker.js";
-                return "_next/static/editor.worker.js";
-              };
-            }}
-          />
-        </div>
+        <MonacoEditor
+          style={{ height: "100%", width: "100%" }}
+          value={source}
+          onChange={setSource}
+          theme="vs-dark"
+        />
 
         <div
           style={{
