@@ -4,7 +4,6 @@ import * as sqrlRedisFunctions from "sqrl-redis-functions";
 import { Request, Response, WikiEvent, LogEntry } from "../src/types";
 import { Execution, AT } from "sqrl";
 import { invariant } from "../src/invariant";
-import SqrlRuleSlot from "sqrl/lib/slot/SqrlRuleSlot";
 
 const COMPILE_DEBOUNCE_MS = 15;
 const ctx: Worker = self as any;
@@ -14,6 +13,11 @@ let compileTimeout: any = null;
 function respond(response: Response) {
   ctx.postMessage(response);
 }
+
+// TODO(meyer) look into why this isn't getting transformed
+(ctx as any).setImmediate = (func: (...args: any) => void) => {
+  setTimeout(func, 0);
+};
 
 async function buildInstance() {
   const instance = SQRL.createInstance({
