@@ -1,10 +1,10 @@
-import * as SQRL from 'sqrl';
-import * as sqrlJsonPath from 'sqrl-jsonpath';
-import * as sqrlRedisFunctions from 'sqrl-redis-functions';
-import { Request, Response, WikiEvent, LogEntry} from '../src/types';
-import { Execution, AT } from 'sqrl';
-import { invariant } from '../src/invariant';
-import SqrlRuleSlot from 'sqrl/lib/slot/SqrlRuleSlot';
+import * as SQRL from "sqrl";
+import * as sqrlJsonPath from "sqrl-jsonpath";
+import * as sqrlRedisFunctions from "sqrl-redis-functions";
+import { Request, Response, WikiEvent, LogEntry } from "../src/types";
+import { Execution, AT } from "sqrl";
+import { invariant } from "../src/invariant";
+import SqrlRuleSlot from "sqrl/lib/slot/SqrlRuleSlot";
 
 const COMPILE_DEBOUNCE_MS = 15;
 const ctx: Worker = self as any;
@@ -19,10 +19,10 @@ async function buildInstance() {
   const instance = SQRL.createInstance({
     config: {
       "state.allow-in-memory": true,
-    }
+    },
   });
-  await instance.importFromPackage('sqrl-jsonpath', sqrlJsonPath);
-  await instance.importFromPackage('sqrl-redis-functions', sqrlRedisFunctions);
+  await instance.importFromPackage("sqrl-jsonpath", sqrlJsonPath);
+  await instance.importFromPackage("sqrl-redis-functions", sqrlRedisFunctions);
 
   instance.registerStatement(
     "SqrlLogStatements",
@@ -33,7 +33,7 @@ async function buildInstance() {
       allowNull: true,
       args: [AT.state, AT.any.repeated],
       argstring: "format string, value...",
-      docstring: "Logs a message using console.log()"
+      docstring: "Logs a message using console.log()",
     }
   );
 
@@ -43,13 +43,13 @@ async function buildInstance() {
       state.setDefault<LogEntry[]>(logStore, []).push({
         format,
         args,
-      })
+      });
     },
     {
       allowNull: true,
       args: [AT.state, AT.any.repeated],
       argstring: "format string, value...",
-      docstring: "Logs a message using console.log()"
+      docstring: "Logs a message using console.log()",
     }
   );
   return instance;
@@ -57,76 +57,79 @@ async function buildInstance() {
 
 let instancePromise: Promise<SQRL.Instance> = null;
 
-const logStore = Symbol('logs');
+const logStore = Symbol("logs");
 async function compile(source: string) {
   if (!instancePromise) {
-    instancePromise = buildInstance().catch(err => {
+    instancePromise = buildInstance().catch((err) => {
       instancePromise = null;
       throw err;
     });
   }
   const instance = await instancePromise;
   const fs = new SQRL.VirtualFilesystem({
-    'main.sqrl': source,
+    "main.sqrl": source,
   });
-  const {executable} = await SQRL.compileFromFilesystem(instance, fs)
+  const { executable } = await SQRL.compileFromFilesystem(instance, fs);
 
   return executable;
 }
 
-let latestSource: string = '';
+let latestSource: string = "";
 let latestExecutable: SQRL.Executable;
 let compilePromise: Promise<void> = null;
 
 function triggerCompile() {
   const source = latestSource;
-  return compile(source).then((exe) => {
-    if (source === latestSource) {
-      latestExecutable = exe;
+  return compile(source)
+    .then((exe) => {
+      if (source === latestSource) {
+        latestExecutable = exe;
 
+        respond({
+          type: "compileOkay",
+          source,
+        });
+      }
+    })
+    .catch((err) => {
+      let message = err.stack;
+      if (err.location) {
+        message =
+          "Line " +
+          err.location.start.line +
+          ":\n" +
+          // sourceArrow(source, err.location) +
+          "\n" +
+          message;
+      }
       respond({
-        type: "compileOkay",
+        type: "compileError",
+        message,
         source,
       });
-    }
-  }).catch(err => {
-    let message = err.stack;
-    if (err.location) {
-      message =
-        "Line " +
-        err.location.start.line +
-        ":\n" +
-        // sourceArrow(source, err.location) +
-        "\n" +
-        message;
-    }
-    respond({
-      type: "compileError",
-      message,
-      source,
+    })
+    .finally(() => {
+      compilePromise = null;
+      if (source !== latestSource) {
+        debounceCompile();
+      }
     });
-  }).finally(() => {
-    compilePromise = null;
-    if (source !== latestSource) {
-      debounceCompile();
-    }
-  });
 }
 
 async function runEvent(event: WikiEvent) {
-  invariant(latestExecutable, 'No executable to process event');
+  invariant(latestExecutable, "No executable to process event");
 
-  const ctx = SQRL.createSimpleContext()
+  const ctx = SQRL.createSimpleContext();
   const execution = await latestExecutable.execute(ctx, {
     manipulator: new SQRL.SimpleManipulator(),
     inputs: {
-      EventData: event
-    }
-  })
+      EventData: event,
+    },
+  });
 
-  await execution.fetchFeature('SqrlExecutionComplete');
+  await execution.fetchFeature("SqrlExecutionComplete");
   await execution.manipulator.mutate(ctx);
-  
+
   return {
     logs: execution.get<LogEntry[]>(logStore, []),
   };
@@ -146,24 +149,23 @@ ctx.addEventListener("message", (event) => {
     latestSource = source;
     debounceCompile();
   } else if (message.type === "event") {
-
     if (latestExecutable) {
       runEvent(message.event).then(
         (props) => {
           respond({
-            type: 'result',
+            type: "result",
             source: latestSource,
-            ...props 
+            ...props,
           });
         },
-        err => {
+        (err) => {
           respond({
             type: "runtimeError",
             message: err.stack,
             source: latestSource,
           });
         }
-      )
+      );
     }
   }
 });

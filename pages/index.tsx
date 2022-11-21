@@ -3,12 +3,17 @@ import dynamic from "next/dynamic";
 
 import { useEffect, useState, useRef } from "react";
 
-import { sprintf } from 'sprintf-js';
+import { sprintf } from "sprintf-js";
 import SAMPLE from "../src/sample.sqrl";
 import Split from "react-split";
 import { invariant } from "../src/invariant";
 import Worker from "worker-loader!../workers/compile.worker";
-import { addMinutes, subMilliseconds, startOfMinute, differenceInMilliseconds } from 'date-fns';
+import {
+  addMinutes,
+  subMilliseconds,
+  startOfMinute,
+  differenceInMilliseconds,
+} from "date-fns";
 import { Request, Response, WikiEvent, Result } from "../src/types";
 
 const MonacoEditor = dynamic(import("react-monaco-editor"), { ssr: false });
@@ -57,18 +62,16 @@ export default function Home() {
     for (const msg of res.logs) {
       messages.push(sprintf(msg.format, ...msg.args));
     }
-    return (
-      <div>
-        {messages}
-      </div>
-    );
+    return <div>{messages}</div>;
   }
   useEffect(() => {
     const scripts: HTMLScriptElement[] = [];
 
     function startDownload(date: Date) {
-      const filename = date.toISOString().substring(0, '0000-00-00T00:00'.length);
-      const script = document.createElement('script');
+      const filename = date
+        .toISOString()
+        .substring(0, "0000-00-00T00:00".length);
+      const script = document.createElement("script");
       script.src = `https://sqrl-aws-diffs.s3.amazonaws.com/v1/en.wikipedia.org/${filename}.js`;
       script.async = true;
       document.body.appendChild(script);
@@ -84,9 +87,9 @@ export default function Home() {
     function nextEvent() {
       if (eventIndex < events.length) {
         req({
-          type: 'event',
-          event: events[eventIndex]
-        })
+          type: "event",
+          event: events[eventIndex],
+        });
         eventIndex++;
       } else {
         const nextDownload = addMinutes(downloadDate, 1);
@@ -111,13 +114,16 @@ export default function Home() {
         nextEventDate = addMinutes(downloadDate, 1);
       }
       clearTimeout(nextEventTimeout);
-      nextEventTimeout = setTimeout(nextEvent, Math.max(10, delayedMsUntil(nextEventDate)));
+      nextEventTimeout = setTimeout(
+        nextEvent,
+        Math.max(10, delayedMsUntil(nextEventDate))
+      );
     }
 
     (window as any).wikiData = (data: {
-      version: string,
-      timestamp: string,
-      events: any[],
+      version: string;
+      timestamp: string;
+      events: any[];
     }) => {
       events = data.events;
       eventIndex = 0;
@@ -131,19 +137,19 @@ export default function Home() {
         }
         firstBatch = false;
       }
-      console.log('Got', events.length, 'in batch, starting from', eventIndex);
+      console.log("Got", events.length, "in batch, starting from", eventIndex);
       scheduleNextEvent();
-    }
+    };
 
     startDownload(downloadDate);
 
     return () => {
-      clearTimeout(nextEventTimeout)
-      scripts.forEach(script => {
+      clearTimeout(nextEventTimeout);
+      scripts.forEach((script) => {
         document.body.removeChild(script);
       });
     };
-  })
+  });
 
   useEffect(() => {
     invariant(!worker.current, "Worker created twice");
