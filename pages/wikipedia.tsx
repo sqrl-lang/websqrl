@@ -1,4 +1,4 @@
-import { StreamPage } from './_page';
+import { StreamPage } from '../components/StreamPage';
 import sampleCode from "../src/wikipedia-sample.sqrl";
 
 export default function TwitterPage() {
