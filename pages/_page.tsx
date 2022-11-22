@@ -1,7 +1,6 @@
 import Head from "next/head";
 import { useEffect, useState, useRef } from "react";
 import { sprintf } from "sprintf-js";
-import SAMPLE from "../src/sample.sqrl";
 import Split from "react-split";
 import { invariant } from "../src/invariant";
 import {
@@ -16,13 +15,18 @@ import { MonacoEditor } from "../src/MonacoEditor";
 let LOG_ID = 0;
 const DELAY_MS = 60_000 * 3;
 
-export default function Home() {
+export function StreamPage(props: {
+  urlPrefix: string,
+  extractDate: (payload: any) => Date,
+  sampleCode: string
+}) {
+  const { extractDate, urlPrefix } = props;
   const worker = useRef<Worker>();
   const lastSource = useRef<string>(null);
   const logs = useRef<JSX.Element[]>([]);
 
   const [, setLogId] = useState(LOG_ID);
-  const [source, setSource] = useState(SAMPLE);
+  const [source, setSource] = useState(props.sampleCode);
 
   function recompile() {
     clearLog("Compiling...");
@@ -57,7 +61,10 @@ export default function Home() {
     for (const msg of res.logs) {
       messages.push(sprintf(msg.format, ...msg.args));
     }
-    return <div>{messages}</div>;
+    return <div style={{
+      backgroundColor: '#555',
+      marginTop: '2px'
+    }}>{messages}</div>;
   }
   useEffect(() => {
     const scripts: HTMLScriptElement[] = [];
@@ -67,7 +74,7 @@ export default function Home() {
         .toISOString()
         .substring(0, "0000-00-00T00:00".length);
       const script = document.createElement("script");
-      script.src = `https://sqrl-aws-diffs.s3.amazonaws.com/v1/en.wikipedia.org/${filename}.js`;
+      script.src = `${urlPrefix}${filename}.js`;
       script.async = true;
       document.body.appendChild(script);
       scripts.push(script);
@@ -104,7 +111,7 @@ export default function Home() {
     function scheduleNextEvent() {
       let nextEventDate: Date;
       if (eventIndex < events.length) {
-        nextEventDate = new Date(events[eventIndex].meta.dt);
+        nextEventDate = new Date(extractDate(events[eventIndex]));
       } else {
         nextEventDate = addMinutes(downloadDate, 1);
       }
@@ -115,7 +122,7 @@ export default function Home() {
       );
     }
 
-    (window as any).wikiData = (data: {
+    (window as any).sqrlInjectData = (data: {
       version: string;
       timestamp: string;
       events: any[];
@@ -124,7 +131,7 @@ export default function Home() {
       eventIndex = 0;
       if (firstBatch) {
         while (eventIndex < events.length) {
-          const eventDate = new Date(events[eventIndex].meta.dt);
+          const eventDate = new Date(extractDate(events[eventIndex]));
           if (delayedMsUntil(eventDate) > 0) {
             break;
           }
